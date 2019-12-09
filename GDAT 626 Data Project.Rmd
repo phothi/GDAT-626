@@ -1,0 +1,102 @@
+---
+title: "GDAT 626 Data Project"
+author: "Pavan Hothi"
+date: "12/1/2019"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+
+c("lattice", 
+  "lubridate",
+  "dplyr",
+  "TSA",
+  "tseries",
+  "tidyverse",
+  "data.table",
+  "astsa",
+  "forecast",
+  "tsfeatures") -> package_names
+for(package_name in package_names) {
+if(!is.element(package_name,
+installed.packages()[,1]))  {
+    install.packages(package_name,
+                     repos = "http://lib.stat.cmu.edu/r/CRAN")
+}
+  library(package_name,
+character.only=TRUE,quietly=TRUE,verbose=FALSE)
+}
+rm(list=c("package_names", "package_name"))
+
+
+```
+
+
+```{r, EDA}
+
+#Read in data
+read.csv("C:/Users/pavan/Documents/GDAT/daily-min-temperatures.csv") -> daily_temps
+
+str(daily_temps)
+#Structure data
+#2 variables; date and temperature in celsius 
+#3650 observations; daily minimum temperature data of Melbourne, Austraila from 01/01/1981-12/31/1990
+
+plot(ts(daily_temps$Temp))
+#Plot shows repetitive peaks about 360+ days apart, which is a given knowing this is daily data on temperature. Seasonality is expected. 
+
+acf(daily_temps$Temp, lag=1000)
+#ACF shows period of approximately 365 days, which makes sense since this is daily data; further evidence pointing towards seasonality 
+
+acf_features(daily_temps$Temp)
+#x_acf1 = 0.77
+#0.77^2 = 0.59
+#The data has a 59% chance at predicting the next day's weather 
+
+
+```
+
+
+```{r, Model Fitting}
+
+auto.arima(daily_temps$Temp)
+#5, 0, 0 is suggested as the best model
+#AIC 16970.26
+
+#Creating subset of data from 3000th-3600th temperatures
+daily_temps$Temp[3000:3600] -> daily_temps_subset
+
+#Creating forecast of daily temps subset data prediciting the next 10 days temperatures 
+forecast(auto.arima(daily_temps_subset), h = 10) -> foreast_daily_temps
+
+#Plotting forecast
+plot(foreast_daily_temps)
+
+plot(ts(daily_temps$Temp[3000:3610]))
+#Plotting daily temps data from 3000th-3610th temperatures for comparison to forecast plot of the next 10 days temperatures; shows prediciton is accurate since plots seem to be similar 
+
+summary(forecast(auto.arima(daily_temps_subset), h = 10))
+#MAPE = 22.5
+#100-22.5 = 77.5
+#77.5% Accuracy at prediciting the next 10 days temperatures 
+
+
+```
+
+
+```{r, Model Fitting 2}
+
+#Creating and applying forecastfunction to the subset data
+far <- function(x, h){forecast(Arima(x, order = c(5, 0, 0)), h=h)}
+#computing forecast errors obtained from applying forecasefunction 
+bd1 <- tsCV(daily_temps_subset, far, h=1)
+plot(bd1)
+#Forecasting and plotting subset data
+auto.arima(daily_temps_subset) %>% forecast %>% plot
+
+plot(ts(daily_temps$Temp[3000:3610]))
+#Accurate prediciton; actual plot looked similar to the prediction plot
+
+
+```
+
